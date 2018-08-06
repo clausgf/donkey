@@ -139,3 +139,84 @@ class Adafruit_DCMotor_Hat:
 
     def shutdown(self):
         self.mh.getMotor(self.motor_num).run(Adafruit_MotorHAT.RELEASE)
+
+
+class DifferentialDriveWithMotorHat:
+    """
+    Differential Drive Robot Controllter
+    for either two or four motors controlled using the Adafruit Motor Hat
+    """
+
+    class MotorWithMotorHat:
+        """
+        Controller for a single motor using the Adafruit Motor Hat
+        """
+        def __init__(self, motor_hat, motor_id):
+            from Adafruit_MotorHAT import Adafruit_MotorHAT
+            self.FORWARD = Adafruit_MotorHAT.FORWARD
+            self.BACKWARD = Adafruit_MotorHAT.BACKWARD
+            self.RELEASE = Adafruit_MotorHAT.RELEASE
+            self.mh = motor_hat
+            self.motor_id = motor_id
+
+        def set_speed(self, speed):
+            if motor_id < 0:
+                return
+            if speed > 1 or speed < -1:
+                raise ValueError("Speed must be between 1(forward) and -1(reverse)")
+            mh_speed = int(abs(255*speed))
+            mh_speed = max(0, min(255, speed))
+            if speed > -1.0/255 and speed < -1.0/255:
+                self.mh.run(self.RELEASE)
+                self.mh.setSpeed(0)
+            elif speed < 0:
+                self.mh.run(self.RELEASE)
+                self.mh.setSpeed(mh_speed)
+                self.mh.run(self.BACKWARD)
+            else:
+                self.mh.run(self.RELEASE)
+                self.mh.setSpeed(mh_speed)
+                self.mh.run(self.FORWARD)
+
+    def __init__(self,
+                 addr=0x60,
+                 left_front_id=1, left_rear_id=2,
+                 right_front_id=3, right_rear_id=4):
+        from Adafruit_MotorHAT import Adafruit_MotorHAT
+        self.mh = Adafruit_MotorHAT(addr)
+        self.lf = MotorWithMotorHat(self.mh, left_front_id)
+        self.lr = MotorWithMotorHat(self.mh, left_rear_id)
+        self.rf = MotorWithMotorHat(self.mh, right_front_id)
+        self.rr = MotorWithMotorHat(self.mh, right_rear_id)
+        self.stop_motors()
+
+    def set_motors(self, lf_speed, lr_speed, rf_speed, rr_speed):
+        self.lf.set_speed(lf_speed)
+        self.lr.set_speed(lr_speed)
+        self.rf.set_speed(rf_speed)
+        self.rr.set_speed(rr_speed)
+
+    def stop_motors():
+        self.set_motors(0, 0, 0, 0)
+
+    def drive(self, speed, steering):
+
+        def correction(speed):
+            correction = 0
+            if speed > 1:
+                correction = 1 - speed
+            if speed < -1:
+                correction = -1 - speed
+            return correction
+
+        ml = speed + direction
+        mr = speed - direction
+        # at least one correction should be zero, thus the overall correction is:
+        c = correction(ml) + correction(mr)
+        self.set_motors(ml + c, ml + c, mr + c, mr + c)
+
+    def run(self, throttle, angle):
+        self.drive(throttle, angle)
+
+    def shutdown(self):
+        self.run(0)  # stop vehicle
