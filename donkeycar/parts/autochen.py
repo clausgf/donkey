@@ -20,14 +20,8 @@ class SpektrumRemoteReceiver:
     improve resynchronization.
     """
 
-    def __init__(self, poll_delay=0.0,
-                 max_throttle=1.0,
-                 steering_axis='x',
-                 throttle_axis='rz',
-                 steering_scale=1.0,
-                 throttle_scale=-1.0,
-                 dev_fn='/dev/input/js0',
-                 auto_record_on_throttle=True):
+    def __init__(self, channels = (), serialPort="/dev/serial0"):
+        self.channels = channels
         self.running = True
         self.timestamp = 0
         self.serialPort = serialPort
@@ -78,9 +72,6 @@ class SpektrumRemoteReceiver:
             if channel < len(self.servo_positions):
                 normalized_position = ((position) - self.servo_offset[channel]) * self.servo_scale[channel]
                 self.servo_positions[channel] = normalized_position
-                if self.channel_sensors[channel] is not None:
-                    self.channel_sensors[channel].timestamp = t
-                    self.channel_sensors[channel].value = normalized_position
         self.timestamp = t
 
     def update(self):
@@ -89,7 +80,8 @@ class SpektrumRemoteReceiver:
             self.read()
 
     def run_threaded(self):
-        pass
+        out = (self.servo_positions[channel] for channel self.channels)
+        return out
 
     def run(self):
         raise Exception("We expect for this part to be run with the threaded=True argument.")
