@@ -60,6 +60,13 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
           outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
           threaded=True)
 
+    rc = SpektrumRemoteReceiver(CHANNEL_ANGLE,
+                                CHANNEL_THROTTLE,
+                                CHANNEL_MODE,
+                                CHANNEL_RECORD)
+    V.add(rc, threaded=True,
+          outputs=['user_angle', 'user/throttle', 'user/mode', 'recording'])
+
     # See if we should even run the pilot module.
     # This is only needed because the part run_condition only accepts boolean
     def pilot_condition(mode):
@@ -135,8 +142,6 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     # run the vehicle
     V.start(rate_hz=cfg.DRIVE_LOOP_HZ,
             max_loop_count=cfg.MAX_LOOPS)
-
-
 
 
 def train(cfg, tub_names, new_model_path, base_model_path=None ):
