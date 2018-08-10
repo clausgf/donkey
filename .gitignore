@@ -1,7 +1,12 @@
 
 env/*
+venv/*
 data/*
 dist/*
+
+**/data/*
+**/logs/*
+**/models/*
 
 *.pyc
 .ipynb_checkpoints

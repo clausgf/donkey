@@ -100,12 +100,18 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
                   'pilot/angle', 'pilot/throttle'],
           outputs=['angle', 'throttle'])
 
-    motors = DifferentialDriveWithMotorHat(cfg.MOTORHAT_ADDR,
-                            cfg.MOTORHAT_LEFT_FRONT_ID,
-                            cfg.MOTORHAT_LEFT_REAR_ID,
-                            cfg.MOTORHAT_RIGHT_FRONT_ID,
-                            cfg.MOTORHAT_RIGHT_REAR_ID)
-    V.add(motors, inputs=['throttle', 'angle'])
+    ackermann_to_diff_converter = AckermannToDifferentialDriveConverter()
+    V.add(ackermann_to_diff_converter,
+          inputs=['throttle', 'angle'],
+          outputs='motor_left', 'motor_right')
+
+    motors_part = DifferentialDriveActuator_MotorHat(
+                cfg.MOTORHAT_ADDR,
+                cfg.MOTORHAT_LEFT_FRONT_ID,
+                cfg.MOTORHAT_LEFT_REAR_ID,
+                cfg.MOTORHAT_RIGHT_FRONT_ID,
+                cfg.MOTORHAT_RIGHT_REAR_ID)
+    V.add(motors_part, inputs=['motor_left', 'motor_right'])
 
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']
@@ -188,4 +194,3 @@ if __name__ == '__main__':
         base_model_path = args['--base_model']
         cache = not args['--no_cache']
         train(cfg, tub, new_model_path, base_model_path)
-
