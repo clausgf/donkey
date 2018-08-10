@@ -43,9 +43,11 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     clock = Timestamp()
     V.add(clock, outputs='timestamp')
 
+    # ***** CAMERA *****
     cam = PiCamera(resolution=cfg.CAMERA_RESOLUTION)
     V.add(cam, outputs=['cam/image_array'], threaded=True)
 
+    # ***** JOYSTICK *****
     if use_joystick or cfg.USE_JOYSTICK_AS_DEFAULT:
         ctr = JoystickController(max_throttle=cfg.JOYSTICK_MAX_THROTTLE,
                                  steering_scale=cfg.JOYSTICK_STEERING_SCALE,
@@ -54,65 +56,75 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
         # This web controller will create a web server that is capable
         # of managing steering, throttle, and modes, and more.
         ctr = LocalWebController(use_chaos=use_chaos)
-
     V.add(ctr,
           inputs=['cam/image_array'],
           outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
           threaded=True)
 
-    rc = SpektrumRemoteReceiver(cfg.SPEKTRUM_OFFSET, 
+    # ***** SPEKTRUM REMOTE *****
+    rc = SpektrumRemoteReceiver(cfg.SPEKTRUM_OFFSET,
                                 cfg.SPEKTRUM_SCALE,
                                 cfg.SPEKTRUM_DEFAULT,
                                 cfg.SPEKTRUM_SERIALPORT)
     V.add(rc, threaded=True,
-          outputs=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8'])
-          #outputs=['user_angle', 'user/throttle', 'user/mode', 'recording'])
+          outputs=['rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8'])
+    def spektrum_convert_func(*args):
+        angle = args[0]
+        throttle = args[1]
+        mode = 'user' if args[5] < -0.3 else 'local_angle' if args[5] > 0.3 else 'drive_mode'
+        recording = args[6]
+        run_pilot = (mode == 'user')
+        return angle, throttle, mode, recording, run_pilot
+    spektrum_converter = Lambda(spektrum_convert_func)
+    V.add(spektrum_converter,
+          inputs=['rc2','rc1','rc6','rc7'],
+          outputs=['user_angle', 'user/throttle', 'user/mode', 'recording',
+                   'run_pilot'])
 
-    # See if we should even run the pilot module.
-    # This is only needed because the part run_condition only accepts boolean
+    # ***** user/mode -> run_pilot *****
     def pilot_condition(mode):
         if mode == 'user':
             return False
         else:
             return True
-
     pilot_condition_part = Lambda(pilot_condition)
-    V.add(pilot_condition_part, inputs=['user/mode'],
-                                outputs=['run_pilot'])
+    V.add(pilot_condition_part,
+          inputs=['user/mode'],
+          outputs=['run_pilot'])
 
+    # ***** cam/image_array -> pilot/angle,pilot_throttle *****
     # Run the pilot if the mode is not user.
     kl = KerasCategorical()
     if model_path:
         kl.load(model_path)
-
     V.add(kl, inputs=['cam/image_array'],
               outputs=['pilot/angle', 'pilot/throttle'],
               run_condition='run_pilot')
 
+    # ***** user/*, pilot/* -> angle, throttle *****
     # Choose what inputs should change the car.
     def drive_mode(mode,
                    user_angle, user_throttle,
                    pilot_angle, pilot_throttle):
         if mode == 'user':
             return user_angle, user_throttle
-
         elif mode == 'local_angle':
             return pilot_angle, user_throttle
-
         else:
             return pilot_angle, pilot_throttle
-
     drive_mode_part = Lambda(drive_mode)
     V.add(drive_mode_part,
           inputs=['user/mode', 'user/angle', 'user/throttle',
                   'pilot/angle', 'pilot/throttle'],
           outputs=['angle', 'throttle'])
 
+    # ***** throttle, angle -> motor_left, motor_right *****
     ackermann_to_diff_converter = AckermannToDifferentialDriveConverter()
     V.add(ackermann_to_diff_converter,
           inputs=['throttle', 'angle'],
           outputs=['motor_left', 'motor_right'])
 
+    # ***** motor_left, motor_right -> DRIVE *****
     motors_part = DifferentialDriveActuator_MotorHat(
                 cfg.MOTORHAT_ADDR,
                 cfg.MOTORHAT_LEFT_FRONT_ID,
@@ -121,12 +133,11 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
                 cfg.MOTORHAT_RIGHT_REAR_ID)
     V.add(motors_part, inputs=['motor_left', 'motor_right'])
 
-    # output debug data
-    def debug_func(*args):
-        print(*args)
-
-    debug_keys = ["angle", "throttle", "motor_left", "motor_right",
+    # ***** output debug data *****
+    debug_keys = ['user_mode', "angle", "throttle", "motor_left", "motor_right",
                   'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']
+    def debug_func(*args):
+        print(args[0], " ".join("{:0.2f}".format(e) for e in args[1:]))
     V.add(Lambda(debug_func), inputs=debug_keys)
 
     # add tub to save data
