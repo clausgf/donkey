@@ -185,7 +185,7 @@ class AckermannToDifferentialDriveConverter:
     def __init__(self):
         pass
 
-    def drive(self, speed, steering):
+    def drive(self, steering, speed):
 
         def correction(speed):
             correction = 0
@@ -202,6 +202,6 @@ class AckermannToDifferentialDriveConverter:
         #print('drive({:5.2f}, {:5.2f}) {:5.2f} {:5.2f} {:5.2f}'.format(speed, steering, ml, mr, c))
         return ml + c, mr + c
 
-    def run(self, throttle, angle):
-        ml, mr = self.drive(throttle, 0.5*angle)
+    def run(self, angle, throttle):
+        ml, mr = self.drive(0.3*angle, throttle)
         return ml, mr

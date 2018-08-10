@@ -71,14 +71,14 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     def spektrum_convert_func(*args):
         angle = args[0]
         throttle = args[1]
-        mode = 'user' if args[5] < -0.3 else 'local_angle' if args[5] > 0.3 else 'drive_mode'
-        recording = args[6]
+        mode = 'user' if args[2] < -0.3 else 'local_angle' if args[2] > 0.3 else 'drive_mode'
+        recording = args[3]
         run_pilot = (mode == 'user')
         return angle, throttle, mode, recording, run_pilot
     spektrum_converter = Lambda(spektrum_convert_func)
     V.add(spektrum_converter,
           inputs=['rc2','rc1','rc6','rc7'],
-          outputs=['user_angle', 'user/throttle', 'user/mode', 'recording',
+          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording',
                    'run_pilot'])
 
     # ***** user/mode -> run_pilot *****
@@ -121,7 +121,7 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     # ***** throttle, angle -> motor_left, motor_right *****
     ackermann_to_diff_converter = AckermannToDifferentialDriveConverter()
     V.add(ackermann_to_diff_converter,
-          inputs=['throttle', 'angle'],
+          inputs=['angle', 'throttle'],
           outputs=['motor_left', 'motor_right'])
 
     # ***** motor_left, motor_right -> DRIVE *****
@@ -134,11 +134,11 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     V.add(motors_part, inputs=['motor_left', 'motor_right'])
 
     # ***** output debug data *****
-    debug_keys = ['user_mode', "angle", "throttle", "motor_left", "motor_right",
-                  'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']
+    debug_keys = ['user/mode', "angle", "throttle", "motor_left", "motor_right",
+            'rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8']
     def debug_func(*args):
         print(args[0], " ".join("{:0.2f}".format(e) for e in args[1:]))
-    V.add(Lambda(debug_func), inputs=debug_keys)
+    #V.add(Lambda(debug_func), inputs=debug_keys)
 
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']
