@@ -113,6 +113,13 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
                 cfg.MOTORHAT_RIGHT_REAR_ID)
     V.add(motors_part, inputs=['motor_left', 'motor_right'])
 
+    # output debug data
+    def debug_func(*args):
+        print(*args)
+
+    debug_keys = ["angle", "throttle", "motor_left", "motor_right"]
+    V.add(Lambda(debug_func), inputs=debug_keys)
+
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']
     types = ['image_array', 'float', 'float',  'str', 'str']
