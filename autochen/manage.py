@@ -21,10 +21,10 @@ import donkeycar as dk
 from donkeycar.parts.camera import PiCamera
 from donkeycar.parts.transform import Lambda
 from donkeycar.parts.keras import KerasCategorical
-from donkeycar.parts.actuator import DifferentialDriveWithMotorHat
 from donkeycar.parts.datastore import TubGroup, TubWriter
 from donkeycar.parts.controller import LocalWebController, JoystickController
 from donkeycar.parts.clock import Timestamp
+from donkeycar.parts.autochen import *
 
 
 def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
@@ -103,7 +103,7 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     ackermann_to_diff_converter = AckermannToDifferentialDriveConverter()
     V.add(ackermann_to_diff_converter,
           inputs=['throttle', 'angle'],
-          outputs='motor_left', 'motor_right')
+          outputs=['motor_left', 'motor_right'])
 
     motors_part = DifferentialDriveActuator_MotorHat(
                 cfg.MOTORHAT_ADDR,

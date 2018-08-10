@@ -7,6 +7,7 @@ dist/*
 **/data/*
 **/logs/*
 **/models/*
+**/tub
 
 *.pyc
 .ipynb_checkpoints

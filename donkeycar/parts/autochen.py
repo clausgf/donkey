@@ -184,6 +184,7 @@ class AckermannToDifferentialDriveConverter:
     """
 
     def __init__(self):
+        pass
 
     def drive(self, speed, steering):
 
