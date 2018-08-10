@@ -1,4 +1,5 @@
 import serial
+import time
 import logging
 from struct import *
 
@@ -20,12 +21,15 @@ class SpektrumRemoteReceiver:
     improve resynchronization.
     """
 
-    def __init__(self, channels = (), serialPort="/dev/serial0"):
-        self.channels = channels
+    def __init__(self, servo_offset, servo_scale, servo_default, serialPort="/dev/serial0"):
         self.running = True
         self.timestamp = 0
+        self.servo_offset = servo_offset
+        self.servo_scale = servo_scale
+        self.servo_default = servo_default
+        self.servo_positions = servo_default
         self.serialPort = serialPort
-        self.serial = serial.Serial(port=self._serialPort, baudrate=115200,
+        self.serial = serial.Serial(port=self.serialPort, baudrate=115200,
                                     bytesize=serial.EIGHTBITS,
                                     parity=serial.PARITY_NONE,
                                     stopbits=serial.STOPBITS_ONE)
@@ -48,11 +52,11 @@ class SpektrumRemoteReceiver:
         while dt < dt_threshold:
             self.serial.read(1)
             t = time.time()
-            dt = t-t_lastbit
+            dt = t - t_lastbit
             t_lastbit = t
         # We've found a gap between bytes of at least 5 ms!
         # skip the rest of the data packet (16 - 1 bytes)
-        self._serial.read(15)
+        self.serial.read(15)
 
     def read(self):
         """
@@ -80,8 +84,11 @@ class SpektrumRemoteReceiver:
             self.read()
 
     def run_threaded(self):
-        out = (self.servo_positions[channel] for channel self.channels)
-        return out
+        if (time.time() - self.timestamp) < 0.1:
+            out = self.servo_positions
+        else:
+            out = self.servo_default
+        return list(out)
 
     def run(self):
         raise Exception("We expect for this part to be run with the threaded=True argument.")

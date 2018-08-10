@@ -60,12 +60,13 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
           outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
           threaded=True)
 
-    rc = SpektrumRemoteReceiver(CHANNEL_ANGLE,
-                                CHANNEL_THROTTLE,
-                                CHANNEL_MODE,
-                                CHANNEL_RECORD)
+    rc = SpektrumRemoteReceiver(cfg.SPEKTRUM_OFFSET, 
+                                cfg.SPEKTRUM_SCALE,
+                                cfg.SPEKTRUM_DEFAULT,
+                                cfg.SPEKTRUM_SERIALPORT)
     V.add(rc, threaded=True,
-          outputs=['user_angle', 'user/throttle', 'user/mode', 'recording'])
+          outputs=['c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8'])
+          #outputs=['user_angle', 'user/throttle', 'user/mode', 'recording'])
 
     # See if we should even run the pilot module.
     # This is only needed because the part run_condition only accepts boolean
@@ -124,7 +125,8 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     def debug_func(*args):
         print(*args)
 
-    debug_keys = ["angle", "throttle", "motor_left", "motor_right"]
+    debug_keys = ["angle", "throttle", "motor_left", "motor_right",
+                  'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8']
     V.add(Lambda(debug_func), inputs=debug_keys)
 
     # add tub to save data
