@@ -38,7 +38,7 @@ class LocalWebController(tornado.web.Application):
 
         self.angle = 0.0
         self.throttle = 0.0
-        self.mode = 'user'
+        self.mode = 'manual'
         self.recording = False
         self.ip_address = util.web.get_ip_address()
         self.access_url = 'http://{}:{}'.format(self.ip_address, self.port)

@@ -13,7 +13,7 @@ var driveHandler = new function() {
                           },
                   'brakeOn': true,
                   'recording': false,
-                  'driveMode': "user",
+                  'driveMode': "manual",
                   'pilot': 'None',
                   'session': 'None',
                   'lag': 0,
@@ -76,8 +76,8 @@ var driveHandler = new function() {
           if(e.which == 74) { angleLeft() } // 'j' turn left
           if(e.which == 76) { angleRight() } // 'l' turn right
           if(e.which == 65) { updateDriveMode('auto') } // 'a' turn on auto mode
-          if(e.which == 68) { updateDriveMode('user') } // 'd' turn on manual mode
-          if(e.which == 83) { updateDriveMode('auto_angle') } // 'a' turn on auto mode
+          if(e.which == 77) { updateDriveMode('manual') } // 'm' turn on manual mode
+          if(e.which == 83) { updateDriveMode('auto_angle') } // 's' turn on auto_angle (steering) mode
       });
 
 
@@ -436,7 +436,7 @@ var driveHandler = new function() {
           state.tele.user.angle = 0
           state.tele.user.throttle = 0
           state.recording = false
-          state.driveMode = 'user';
+          state.driveMode = 'manual';
           postDrive()
 
 
@@ -631,4 +631,3 @@ function remap( x, oMin, oMax, nMin, nMax ){
 
 return result;
 }
-

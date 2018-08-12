@@ -76,9 +76,9 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
         mode = 'manual' if args[2] > 0.3 else 'auto' if args[2] < -0.3 else 'auto_angle'
         recording = args[3] <= 0.3
         return angle, throttle, mode, recording
-    V.add(Lambda(spektrum_convert_func),
-          inputs=['rc2','rc1','rc6','rc7'],
-          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'])
+    #V.add(Lambda(spektrum_convert_func),
+    #      inputs=['rc2','rc1','rc6','rc7'],
+    #      outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'])
 
     # ***** user/mode -> run_pilot *****
     V.add(Lambda(lambda mode: mode.lower() != 'manual'),
