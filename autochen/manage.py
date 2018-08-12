@@ -71,9 +71,9 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     def spektrum_convert_func(*args):
         angle = args[0]
         throttle = args[1]
-        mode = 'user' if args[2] < -0.3 else 'local_angle' if args[2] > 0.3 else 'drive_mode'
-        recording = args[3]
-        run_pilot = (mode == 'user')
+        mode = 'manual' if args[2] > 0.3 else 'auto' if args[2] < -0.3 else 'auto_angle'
+        recording = args[3] <= 0.3
+        run_pilot = (mode != 'manual')
         return angle, throttle, mode, recording, run_pilot
     spektrum_converter = Lambda(spektrum_convert_func)
     V.add(spektrum_converter,
@@ -106,9 +106,9 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     def drive_mode(mode,
                    user_angle, user_throttle,
                    pilot_angle, pilot_throttle):
-        if mode == 'user':
+        if mode == 'manual':
             return user_angle, user_throttle
-        elif mode == 'local_angle':
+        elif mode == 'auto_angle':
             return pilot_angle, user_throttle
         else:
             return pilot_angle, pilot_throttle
@@ -139,8 +139,8 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     debug_keys = ['user/mode', "angle", "throttle", "motor_left", "motor_right",
             'rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8']
     def debug_func(*args):
-        print(args[0], " ".join("{:0.2f}".format(e) for e in args[1:]))
-    #V.add(Lambda(debug_func), inputs=debug_keys)
+        print(args[0], " ".join("{:5.2f}".format(e) for e in args[1:]))
+    V.add(Lambda(debug_func), inputs=debug_keys)
 
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']
