@@ -1,20 +1,18 @@
 import serial
 import time
+import math
 import logging
 from struct import *
 
 
 class SpektrumRemoteReceiver:
-    """
-    Monitor a Spektrum Remote Receiver in 2048 Mode via the serial protocol.
+    """Monitor a Spektrum Remote Receiver in 2048 Mode via the serial protocol.
     To remain synchronized, this part runs a separate thread.
     Specified in https://www.spektrumrc.com/ProdInfo/Files/Remote%20Receiver%20Interfacing%20Rev%20A.pdf
     Inspired by https://github.com/samfok/remote_receiver_tutorial
 
-    The remote receiver must be connected to the following pins (Raspi Model 3):
-    TODO
-
-    TODO: Don't forget to enable the Raspi's serial port via raspi-config!
+    The remote receiver must be connected to the following pins (Raspi Model 3): TODO
+    Don't forget to enable the serial port via raspi-config!
 
     TODO: Unfortunately, the Raspi is not fast enough for reliable
     synchronization, thus fiddle with realtime priorities and
@@ -35,8 +33,7 @@ class SpektrumRemoteReceiver:
                                     stopbits=serial.STOPBITS_ONE)
 
     def synchronize(self):
-        """
-        Synchronize with the remote receiver by detecting the gap
+        """Synchronize with the remote receiver by detecting the gap
         between successive packets based on their timing.
         Rationale from https://github.com/samfok/remote_receiver_tutorial:
         Packets are communicated every 11ms. At 115200 bps, a bit is read in
@@ -100,8 +97,7 @@ class SpektrumRemoteReceiver:
 
 
 class DifferentialDriveActuator_MotorHat:
-    """
-    Differential Drive Robot Actuator
+    """Differential Drive Robot Actuator
     for either two or four motors controlled using the Adafruit Motor Hatself.
     The motor_id parameters of the constructor (left_front_id...) are the
     motor head ids of the respective motor. Use a motor_id < 0 to reverse
@@ -177,15 +173,25 @@ class DifferentialDriveActuator_MotorHat:
 
 
 class AckermannToDifferentialDriveConverter:
-    """
-    Simulate Ackermann steering with differential drive.
-    TODO privide a correct implementation
+    """Simulate Ackermann steering with two-wheel differential drive robot.
+    In a four-wheel differential drive, motors on each side could be controlled
+    in the same way.
+    This class expects a steeering parameter in terms of inverse radius of
+    curvature. The other control parameter is the speed of the tangential
+    motion of the robot's center.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, length, width):
+        """Construct Ackermann Steering simulation with differential drive robot.
 
-    def drive(self, steering, speed):
+        Parameters:
+        length: length from axle to axle
+        width: width form wheel to wheel measured along an axle
+        """
+        self.length = length
+        self.width = width
+
+    def limit_motors(self, ml, mr):
 
         def correction(speed):
             correction = 0
@@ -195,13 +201,34 @@ class AckermannToDifferentialDriveConverter:
                 correction = -1 - speed
             return correction
 
-        ml = speed + steering
-        mr = speed - steering
         # at least one correction should be zero, thus the overall correction is:
-        c = correction(ml) + correction(mr)
-        #print('drive({:5.2f}, {:5.2f}) {:5.2f} {:5.2f} {:5.2f}'.format(speed, steering, ml, mr, c))
-        return ml + c, mr + c
+        corr = correction(ml) + correction(mr)
+        return ml + corr, mr + corr
 
-    def run(self, angle, throttle):
-        ml, mr = self.drive(0.3*angle, throttle)
+    def run(self, steering, throttle):
+        """Compute left and right motors' speed from steering angle and throttle.
+        The steering parameter has priority over the speed, i.e. the speed is
+        automatically reduces when necessary to steer the correct angle.
+        With a given steering parameter, the method tries to
+        drive on the same circle independent of the speed parameter $v$.
+
+        Parameters:
+        steering: Steering parameter in terms of inverse radius
+        of curvature. *Steering* ranges from $-1/L$ (tight left turn) over
+        $0$ (straigt) to $1/L$ (tight right turn) with the vehicle's length $L$
+        measured from axle to axle.
+        throttle: Tangential speed $v$ the vehicle's center (arbitrary units).
+        *Throttle* ranges from -1 (full speed backwards) over 0 (stop) to
+        1 (full speed forward).
+        """
+        l = self.length
+        w = self.width
+        inv_r = steering
+        v = speed
+        vi = v * sqrt( (1 - w / 2 * inv_r) ** 2 + (l / 2 * inv_r) ** 2 )
+        vo = v * sqrt( (1 + w / 2 * inv_r) ** 2 + (l / 2 * inv_r) ** 2 )
+        ml, mr = limit_motors(vi, vo)
+        print("{:5.2f} {:5.2f} {:5.2f}/{:5.2f} {:5.2f}/{:5.2f}".format(
+            steering, throttle, vi, vo, ml, mr
+        ))
         return ml, mr

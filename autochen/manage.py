@@ -119,7 +119,9 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
           outputs=['angle', 'throttle'])
 
     # ***** throttle, angle -> motor_left, motor_right *****
-    ackermann_to_diff_converter = AckermannToDifferentialDriveConverter()
+    ackermann_to_diff_converter = AckermannToDifferentialDriveConverter(
+                cfg.ACKERMANN_LENGTH,
+                cfg.ACKERMANN_WIDTH)
     V.add(ackermann_to_diff_converter,
           inputs=['angle', 'throttle'],
           outputs=['motor_left', 'motor_right'])
