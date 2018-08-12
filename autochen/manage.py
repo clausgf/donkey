@@ -139,8 +139,8 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     debug_keys = ['user/mode', "angle", "throttle", "motor_left", "motor_right",
             'rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8']
     def debug_func(*args):
-        print(args[0], " ".join("{:0.2f}".format(e) for e in args[1:]))
-    #V.add(Lambda(debug_func), inputs=debug_keys)
+        print(args[0], " ".join("{:5.2f}".format(e) for e in args[1:]))
+    V.add(Lambda(debug_func), inputs=debug_keys)
 
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']

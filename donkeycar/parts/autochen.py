@@ -1,6 +1,7 @@
 import serial
 import time
 import math
+import numpy as np
 import logging
 from struct import *
 
@@ -177,7 +178,8 @@ class AckermannToDifferentialDriveConverter:
     In a four-wheel differential drive, motors on each side could be controlled
     in the same way.
     This class expects a steeering parameter in terms of inverse radius of
-    curvature. The other control parameter is the speed of the tangential
+    curvature normalized to the vehicle length, $s=L/r$. The other control 
+    parameter is the speed of the tangential
     motion of the robot's center.
     """
 
@@ -214,21 +216,19 @@ class AckermannToDifferentialDriveConverter:
 
         Parameters:
         steering: Steering parameter in terms of inverse radius
-        of curvature. *Steering* ranges from $-1/L$ (tight left turn) over
-        $0$ (straigt) to $1/L$ (tight right turn) with the vehicle's length $L$
-        measured from axle to axle.
+        of curvature normalized to the vehicle length, $s=L/r$. 
+        *Steering* ranges from 
+        $-1$ (tight left turn) over $0$ (straight) to $1$ (tight right turn).
         throttle: Tangential speed $v$ the vehicle's center (arbitrary units).
         *Throttle* ranges from -1 (full speed backwards) over 0 (stop) to
         1 (full speed forward).
         """
         l = self.length
         w = self.width
-        inv_r = steering
-        v = speed
-        vi = v * sqrt( (1 - w / 2 * inv_r) ** 2 + (l / 2 * inv_r) ** 2 )
-        vo = v * sqrt( (1 + w / 2 * inv_r) ** 2 + (l / 2 * inv_r) ** 2 )
-        ml, mr = limit_motors(vi, vo)
-        print("{:5.2f} {:5.2f} {:5.2f}/{:5.2f} {:5.2f}/{:5.2f}".format(
-            steering, throttle, vi, vo, ml, mr
-        ))
+        s = np.clip(steering, -1, 1)
+        v = np.clip(throttle, -1, 1)
+        vi = v * math.sqrt( (1 - w/2 * s/l) ** 2 + (s/2) ** 2 )
+        vo = v * math.sqrt( (1 + w/2 * s/l) ** 2 + (s/2) ** 2 )
+        ml, mr = self.limit_motors(vo, vi)
+        #print("ACKERMANN {:5.2f} {:5.2f} {:5.2f}/{:5.2f} {:5.2f}/{:5.2f}".format( steering, throttle, vi, vo, ml, mr))
         return ml, mr
