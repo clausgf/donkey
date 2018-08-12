@@ -16,6 +16,7 @@ import os
 from docopt import docopt
 
 import donkeycar as dk
+from donkeycar.redis_memory import RedisMemory
 
 #import parts
 from donkeycar.parts.camera import PiCamera
@@ -38,7 +39,8 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     to parts requesting the same named input.
     """
 
-    V = dk.vehicle.Vehicle()
+    memory = RedisMemory()
+    V = dk.vehicle.Vehicle(mem=memory)
 
     clock = Timestamp()
     V.add(clock, outputs='timestamp')
@@ -73,22 +75,13 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
         throttle = args[1]
         mode = 'manual' if args[2] > 0.3 else 'auto' if args[2] < -0.3 else 'auto_angle'
         recording = args[3] <= 0.3
-        run_pilot = (mode != 'manual')
-        return angle, throttle, mode, recording, run_pilot
-    spektrum_converter = Lambda(spektrum_convert_func)
-    V.add(spektrum_converter,
+        return angle, throttle, mode, recording
+    V.add(Lambda(spektrum_convert_func),
           inputs=['rc2','rc1','rc6','rc7'],
-          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording',
-                   'run_pilot'])
+          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'])
 
     # ***** user/mode -> run_pilot *****
-    def pilot_condition(mode):
-        if mode == 'user':
-            return False
-        else:
-            return True
-    pilot_condition_part = Lambda(pilot_condition)
-    V.add(pilot_condition_part,
+    V.add(Lambda(lambda mode: mode.lower() != 'manual'),
           inputs=['user/mode'],
           outputs=['run_pilot'])
 
@@ -96,6 +89,7 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     # Run the pilot if the mode is not user.
     kl = KerasCategorical()
     if model_path:
+        print("Loading model...")
         kl.load(model_path)
     V.add(kl, inputs=['cam/image_array'],
               outputs=['pilot/angle', 'pilot/throttle'],
@@ -136,10 +130,10 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     V.add(motors_part, inputs=['motor_left', 'motor_right'])
 
     # ***** output debug data *****
-    debug_keys = ['user/mode', "angle", "throttle", "motor_left", "motor_right",
-            'rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8']
+    debug_keys = ['user/mode', 'run_pilot', "angle", "throttle", "motor_left", "motor_right",
+            ]#'rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8']
     def debug_func(*args):
-        print(args[0], " ".join("{:5.2f}".format(e) for e in args[1:]))
+        print(args[0], " ", args[1], " ".join("{:5.2f}".format(e) for e in args[2:]))
     V.add(Lambda(debug_func), inputs=debug_keys)
 
     # add tub to save data
