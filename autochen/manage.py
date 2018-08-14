@@ -68,8 +68,8 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
                                 cfg.SPEKTRUM_SCALE,
                                 cfg.SPEKTRUM_DEFAULT,
                                 cfg.SPEKTRUM_SERIALPORT)
-    V.add(rc, threaded=True,
-          outputs=['rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8'])
+    #V.add(rc, threaded=True,
+    #      outputs=['rc', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8'])
     def spektrum_convert_func(*args):
         angle = args[0]
         throttle = args[1]
@@ -79,6 +79,26 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     #V.add(Lambda(spektrum_convert_func),
     #      inputs=['rc2','rc1','rc6','rc7'],
     #      outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'])
+
+    # ***** MOVE32 REMOTE *****
+    rc = Move32Receiver(cfg.MOVE32_OFFSET,
+                        cfg.MOVE32_SCALE,
+                        cfg.MOVE32_DEFAULT,
+                        cfg.MOVE32_SERIALPORT,
+                        cfg.MOVE32_RXTYPE,
+                        cfg.MOVE32_RXAUTO,
+                        cfg.MOVE32_TIMEOUT)
+    V.add(rc, threaded=True,
+          outputs=['rc', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8'])
+    def move32_convert_func(*args):
+        angle = args[0]
+        throttle = args[1]
+        mode = 'manual' if args[2] > 0.3 else 'auto' if args[2] < -0.3 else 'auto_angle'
+        recording = args[3] <= 0.3
+        return angle, throttle, mode, recording
+    V.add(Lambda(move32_convert_func),
+          inputs=['rc2','rc1','rc6','rc7'],
+          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'])
 
     # ***** user/mode -> run_pilot *****
     V.add(Lambda(lambda mode: mode.lower() != 'manual'),

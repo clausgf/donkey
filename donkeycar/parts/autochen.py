@@ -6,6 +6,86 @@ import logging
 from struct import *
 
 
+class Move32Receiver:
+    """Use a move32 controller based on a cheap Naze32 quadrocopter flight
+    controller to receive signals form an rc receiver; could be extended
+    to output signals for servos/ESCs.
+    """
+
+    def __init__(self, channel_offset, channel_scale, channel_default,
+                 serialPort="/dev/serial0", rx_type=1, rx_auto=1, timeout=0.2):
+        """Construct a controller for a serial Move32 module, which is
+        connected to a rc receiver (no support for servo/ESC).
+
+        Parameters:
+        channel_offset: list of offsets to add to each channel before scaling
+        channel_scale: list of scaling factors for each channel after adding the offset
+        channel_default: list of default for each channel after timeout
+        serialPort: path to serial interface device file
+        rx_type: Move32 receiver type, 0=full receiver, 1=CPPM receiver
+        rx_auto: Move32 auto rx report interval, 0: off; 1: onChange; >1: interval in ms
+        timeout: timeout before transmitting default values
+        """
+        self.running = True
+        self.timestamp = 0
+        self.channel_offset = channel_offset
+        self.channel_scale = channel_scale
+        self.channel_default = channel_default
+        self.channels = channel_default
+        self.serialPort = serialPort
+        self.rx_type = rx_type
+        self.rx_auto = rx_auto
+        self.timeout = timeout
+        self.serial = serial.Serial(port=self.serialPort, timeout=self.timeout,
+                                    baudrate=115200,
+                                    bytesize=serial.EIGHTBITS,
+                                    parity=serial.PARITY_NONE,
+                                    stopbits=serial.STOPBITS_ONE
+
+    def read(self):
+        for i in range(1,8):
+            channel = (data[i] & 0x7800) >> 11  # bit 14-11
+            position = (data[i] & 0x07ff)       # bit 10-0
+            if channel < len(self.servo_positions):
+                normalized_position = ((position) + self.servo_offset[channel]) * self.servo_scale[channel]
+                self.servo_positions[channel] = normalized_position
+        self.timestamp = time.time()
+
+    def update(self):
+        self.serial.write('rx_type {}\n'.format(self.rx_type).encode('utf-8'))
+        self.serial.write('rx_auto {}\n'.format(self.rx_auto).encode('utf-8'))
+        while self.running
+            line = self.serial.readline().decode('utf-8')
+            answer = line.split()
+            if len(answer) == 2 and answer[0] == 'ok':
+                # we've receive a command confirmation
+                pass
+            elif len(answer) > 3 and answer[0] == 'ok' and answer[1] == 'rx':
+                # we've received something like this: ok rx 10000 1500 1500 1500 ...
+                t = answer[2]
+                channels = [ int(c) for c in answer[3:] ]
+                for i in range(0, len(channels)-1):
+                    self.channels[i] = (channels[i] + self.channel_offset[channel]) * self.channel_scale[channel]
+                self.timestamp = time.time()
+            else:
+                # we're unable to parse the answer
+                pass
+
+    def run_threaded(self):
+        if (time.time() - self.timestamp) < self.timeout:
+            out = self.channels
+        else:
+            out = self.channel_default
+        return list(out)
+
+    def run(self):
+        raise Exception("We expect for this part to be run with the threaded=True argument.")
+        return False
+
+    def shutdown(self):
+        self.running = False
+
+
 class SpektrumRemoteReceiver:
     """Monitor a Spektrum Remote Receiver in 2048 Mode via the serial protocol.
     To remain synchronized, this part runs a separate thread.
@@ -16,11 +96,12 @@ class SpektrumRemoteReceiver:
     Don't forget to enable the serial port via raspi-config!
 
     TODO: Unfortunately, the Raspi is not fast enough for reliable
-    synchronization, thus fiddle with realtime priorities and
-    improve resynchronization.
+    synchronization in auto mode - manual mode, however, works find;
+    idea: fiddle with realtime priorities and improve resynchronization.
     """
 
-    def __init__(self, servo_offset, servo_scale, servo_default, serialPort="/dev/serial0"):
+    def __init__(self, servo_offset, servo_scale, servo_default,
+                 serialPort="/dev/serial0", timeout=0.2):
         self.running = True
         self.timestamp = 0
         self.servo_offset = servo_offset
@@ -28,6 +109,7 @@ class SpektrumRemoteReceiver:
         self.servo_default = servo_default
         self.servo_positions = servo_default
         self.serialPort = serialPort
+        self.timeout = timeout
         self.serial = serial.Serial(port=self.serialPort, baudrate=115200,
                                     bytesize=serial.EIGHTBITS,
                                     parity=serial.PARITY_NONE,
@@ -72,7 +154,7 @@ class SpektrumRemoteReceiver:
             channel = (data[i] & 0x7800) >> 11  # bit 14-11
             position = (data[i] & 0x07ff)       # bit 10-0
             if channel < len(self.servo_positions):
-                normalized_position = ((position) - self.servo_offset[channel]) * self.servo_scale[channel]
+                normalized_position = ((position) + self.servo_offset[channel]) * self.servo_scale[channel]
                 self.servo_positions[channel] = normalized_position
         self.timestamp = t
 
@@ -82,7 +164,7 @@ class SpektrumRemoteReceiver:
             self.read()
 
     def run_threaded(self):
-        if (time.time() - self.timestamp) < 0.1:
+        if (time.time() - self.timestamp) < self.timeout:
             out = self.servo_positions
         else:
             out = self.servo_default
@@ -94,7 +176,6 @@ class SpektrumRemoteReceiver:
 
     def shutdown(self):
         self.running = False
-        time.sleep(0.5)
 
 
 class DifferentialDriveActuator_MotorHat:
@@ -170,7 +251,7 @@ class DifferentialDriveActuator_MotorHat:
         self.set_motors(left_speed, left_speed, right_speed, right_speed)
 
     def shutdown(self):
-        self.run(0)  # stop vehicle
+        self.stop_motors()
 
 
 class AckermannToDifferentialDriveConverter:
@@ -178,7 +259,7 @@ class AckermannToDifferentialDriveConverter:
     In a four-wheel differential drive, motors on each side could be controlled
     in the same way.
     This class expects a steeering parameter in terms of inverse radius of
-    curvature normalized to the vehicle length, $s=L/r$. The other control 
+    curvature normalized to the vehicle length, $s=L/r$. The other control
     parameter is the speed of the tangential
     motion of the robot's center.
     """
@@ -216,8 +297,8 @@ class AckermannToDifferentialDriveConverter:
 
         Parameters:
         steering: Steering parameter in terms of inverse radius
-        of curvature normalized to the vehicle length, $s=L/r$. 
-        *Steering* ranges from 
+        of curvature normalized to the vehicle length, $s=L/r$.
+        *Steering* ranges from
         $-1$ (tight left turn) over $0$ (straight) to $1$ (tight right turn).
         throttle: Tangential speed $v$ the vehicle's center (arbitrary units).
         *Throttle* ranges from -1 (full speed backwards) over 0 (stop) to
