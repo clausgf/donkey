@@ -40,21 +40,12 @@ class Move32Receiver:
                                     baudrate=115200,
                                     bytesize=serial.EIGHTBITS,
                                     parity=serial.PARITY_NONE,
-                                    stopbits=serial.STOPBITS_ONE
-
-    def read(self):
-        for i in range(1,8):
-            channel = (data[i] & 0x7800) >> 11  # bit 14-11
-            position = (data[i] & 0x07ff)       # bit 10-0
-            if channel < len(self.servo_positions):
-                normalized_position = ((position) + self.servo_offset[channel]) * self.servo_scale[channel]
-                self.servo_positions[channel] = normalized_position
-        self.timestamp = time.time()
+                                    stopbits=serial.STOPBITS_ONE)
 
     def update(self):
         self.serial.write('rx_type {}\n'.format(self.rx_type).encode('utf-8'))
         self.serial.write('rx_auto {}\n'.format(self.rx_auto).encode('utf-8'))
-        while self.running
+        while self.running:
             line = self.serial.readline().decode('utf-8')
             answer = line.split()
             if len(answer) == 2 and answer[0] == 'ok':
@@ -65,7 +56,7 @@ class Move32Receiver:
                 t = answer[2]
                 channels = [ int(c) for c in answer[3:] ]
                 for i in range(0, len(channels)-1):
-                    self.channels[i] = (channels[i] + self.channel_offset[channel]) * self.channel_scale[channel]
+                    self.channels[i] = (channels[i] + self.channel_offset[i]) * self.channel_scale[i]
                 self.timestamp = time.time()
             else:
                 # we're unable to parse the answer

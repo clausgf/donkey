@@ -46,58 +46,32 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     V.add(clock, outputs='timestamp')
 
     # ***** CAMERA *****
+    print("Starting camera")
     cam = PiCamera(resolution=cfg.CAMERA_RESOLUTION)
     V.add(cam, outputs=['cam/image_array'], threaded=True)
 
-    # ***** JOYSTICK *****
-    if use_joystick or cfg.USE_JOYSTICK_AS_DEFAULT:
-        ctr = JoystickController(max_throttle=cfg.JOYSTICK_MAX_THROTTLE,
-                                 steering_scale=cfg.JOYSTICK_STEERING_SCALE,
-                                 auto_record_on_throttle=cfg.AUTO_RECORD_ON_THROTTLE)
-    else:
-        # This web controller will create a web server that is capable
-        # of managing steering, throttle, and modes, and more.
-        ctr = LocalWebController(use_chaos=use_chaos)
+    # ***** Web Controller *****
+    print("Starting web controller")
+    ctr = LocalWebController(use_chaos=use_chaos)
     V.add(ctr,
           inputs=['cam/image_array'],
           outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
           threaded=True)
 
-    # ***** SPEKTRUM REMOTE *****
-    rc = SpektrumRemoteReceiver(cfg.SPEKTRUM_OFFSET,
-                                cfg.SPEKTRUM_SCALE,
-                                cfg.SPEKTRUM_DEFAULT,
-                                cfg.SPEKTRUM_SERIALPORT)
-    #V.add(rc, threaded=True,
-    #      outputs=['rc', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8'])
-    def spektrum_convert_func(*args):
-        angle = args[0]
-        throttle = args[1]
-        mode = 'manual' if args[2] > 0.3 else 'auto' if args[2] < -0.3 else 'auto_angle'
-        recording = args[3] <= 0.3
-        return angle, throttle, mode, recording
-    #V.add(Lambda(spektrum_convert_func),
-    #      inputs=['rc2','rc1','rc6','rc7'],
-    #      outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'])
+    # ***** SPEKTRUM/MOVE32 REMOTE *****
+    print("Starting Spektrum/Move32")
+    #rc = SpektrumRemoteReceiver(cfg.SPEKTRUM_OFFSET, cfg.SPEKTRUM_SCALE, cfg.SPEKTRUM_DEFAULT, cfg.SPEKTRUM_SERIALPORT)
+    rc = Move32Receiver(cfg.MOVE32_OFFSET, cfg.MOVE32_SCALE, cfg.MOVE32_DEFAULT, cfg.MOVE32_SERIALPORT, cfg.MOVE32_RXTYPE, cfg.MOVE32_RXAUTO, cfg.MOVE32_TIMEOUT)
+    V.add(rc, threaded=True, outputs=['rc0', 'rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7'])
 
-    # ***** MOVE32 REMOTE *****
-    rc = Move32Receiver(cfg.MOVE32_OFFSET,
-                        cfg.MOVE32_SCALE,
-                        cfg.MOVE32_DEFAULT,
-                        cfg.MOVE32_SERIALPORT,
-                        cfg.MOVE32_RXTYPE,
-                        cfg.MOVE32_RXAUTO,
-                        cfg.MOVE32_TIMEOUT)
-    V.add(rc, threaded=True,
-          outputs=['rc', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8'])
-    def move32_convert_func(*args):
+    def rc_convert_func(*args):
         angle = args[0]
         throttle = args[1]
         mode = 'manual' if args[2] > 0.3 else 'auto' if args[2] < -0.3 else 'auto_angle'
         recording = args[3] <= 0.3
         return angle, throttle, mode, recording
-    V.add(Lambda(move32_convert_func),
-          inputs=['rc2','rc1','rc6','rc7'],
+    V.add(Lambda(rc_convert_func),
+          inputs=['rc0','rc2','rc5','rc4'],
           outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'])
 
     # ***** user/mode -> run_pilot *****
@@ -107,6 +81,7 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
 
     # ***** cam/image_array -> pilot/angle,pilot_throttle *****
     # Run the pilot if the mode is not user.
+    print("Starting KerasCategorical")
     kl = KerasCategorical()
     if model_path:
         print("Loading model...")
@@ -150,10 +125,10 @@ def drive(cfg, model_path=None, use_joystick=False, use_chaos=False):
     V.add(motors_part, inputs=['motor_left', 'motor_right'])
 
     # ***** output debug data *****
-    debug_keys = ['user/mode', 'run_pilot', "angle", "throttle", "motor_left", "motor_right",
+    debug_keys = ['user/mode', 'recording', 'run_pilot', "angle", "throttle", "motor_left", "motor_right",
             ]#'rc1', 'rc2', 'rc3', 'rc4', 'rc5', 'rc6', 'rc7', 'rc8']
     def debug_func(*args):
-        print(args[0], " ", args[1], " ".join("{:5.2f}".format(e) for e in args[2:]))
+        print(args[0], " ", args[1], " ", args[2], " ".join("{:5.2f}".format(e) for e in args[3:]))
     V.add(Lambda(debug_func), inputs=debug_keys)
 
     # add tub to save data

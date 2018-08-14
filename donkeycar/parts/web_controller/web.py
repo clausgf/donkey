@@ -144,6 +144,7 @@ class VideoAPI(tornado.web.RequestHandler):
                 self.write("Content-length: %s\r\n\r\n" % len(img))
                 self.write(img)
                 self.served_image_timestamp = time.time()
+                #print("web.py len(img)={}".format(len(img)))
                 yield tornado.gen.Task(self.flush)
             else:
                 yield tornado.gen.Task(ioloop.add_timeout, ioloop.time() + interval)
